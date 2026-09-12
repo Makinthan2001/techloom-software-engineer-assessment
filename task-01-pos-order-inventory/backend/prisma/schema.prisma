@@ -1,13 +1,183 @@
-// This is your Prisma schema file,
-// learn more about it in the docs: https://pris.ly/d/prisma-schema
-
-// Get a free hosted Postgres database in seconds: `npx create-db`
+// This is your Prisma schema file for Task 1: Concurrency-Safe POS Backend
 
 generator client {
-  provider = "prisma-client"
-  output   = "../generated/prisma"
+  provider = "prisma-client-js"
 }
 
 datasource db {
   provider = "postgresql"
+}
+
+// ==========================================
+// ENUMS
+// ==========================================
+
+enum Role {
+  ADMIN
+  CASHIER
+}
+
+enum OrderStatus {
+  PENDING     // Order created/cart converted, stock not yet reserved
+  RESERVED    // Stock successfully reserved, awaiting payment
+  PAID        // Payment succeeded, order finalized
+  FAILED      // Payment failed, stock released back to inventory
+  EXPIRED     // 5-minute reservation window expired, stock released back
+  CANCELLED   // Order manually cancelled, stock released back
+}
+
+enum ReservationStatus {
+  ACTIVE      // Currently holding reserved stock
+  RELEASED    // Stock returned to available pool (due to expiry, failure, or cancellation)
+  FINALIZED   // Stock permanently consumed because payment succeeded
+}
+
+enum PaymentStatus {
+  PENDING
+  SUCCESS
+  FAILED
+  TIMEOUT
+}
+
+// ==========================================
+// MODELS
+// ==========================================
+
+model User {
+  id            String         @id @default(uuid())
+  name          String
+  // Email UNIQUE constraint guarantees standard login identity and prevents duplicate registration
+  email         String         @unique
+  passwordHash  String
+  role          Role           @default(CASHIER)
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
+
+  carts         Cart[]
+  orders        Order[]
+  refreshTokens RefreshToken[]
+}
+
+model RefreshToken {
+  id          String    @id @default(uuid())
+  userId      String
+  tokenHash   String
+  expiresAt   DateTime
+  revokedAt   DateTime?
+  createdAt   DateTime  @default(now())
+
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  // Fast lookup of refresh tokens by user ID for session management and revoking
+  @@index([userId])
+  // Fast lookup of refresh tokens by token hash for authentication and token rotation
+  @@index([tokenHash])
+}
+
+model Product {
+  id            String        @id @default(uuid())
+  name          String
+  // Decimal type prevents floating-point rounding errors in pricing and totals
+  price         Decimal       @db.Decimal(10, 2)
+  // Single canonical source of truth for available sellable stock
+  stock         Int
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+
+  cartItems     CartItem[]
+  orderItems    OrderItem[]
+  reservations  Reservation[]
+}
+
+model Cart {
+  id        String     @id @default(uuid())
+  userId    String
+  status    String     @default("ACTIVE")
+  createdAt DateTime   @default(now())
+  updatedAt DateTime   @updatedAt
+
+  user      User       @relation(fields: [userId], references: [id])
+  items     CartItem[]
+
+  // Fast lookup for finding active or converted carts for a specific user
+  @@index([userId, status])
+}
+
+model CartItem {
+  id        String   @id @default(uuid())
+  cartId    String
+  productId String
+  quantity  Int
+
+  cart      Cart     @relation(fields: [cartId], references: [id], onDelete: Cascade)
+  product   Product  @relation(fields: [productId], references: [id])
+
+  // Prevents duplicate rows for the same product in a cart; forces additions to become an upsert
+  @@unique([cartId, productId])
+}
+
+model Order {
+  id             String        @id @default(uuid())
+  userId         String
+  cartId         String?
+  status         OrderStatus   @default(PENDING)
+  // Decimal type prevents floating-point rounding errors in order totals
+  totalAmount    Decimal       @db.Decimal(10, 2)
+  // Enforces database-level idempotency by atomically rejecting duplicate checkout requests with the same key
+  idempotencyKey String        @unique
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
+
+  user           User          @relation(fields: [userId], references: [id])
+  items          OrderItem[]
+  payment        Payment?
+  reservations   Reservation[]
+
+  // Fast lookup for filtering order history by status for a specific user
+  @@index([userId, status])
+}
+
+model OrderItem {
+  id        String   @id @default(uuid())
+  orderId   String
+  productId String
+  quantity  Int
+  // Snapshot of Product.price at purchase time to preserve historical order accuracy if Product.price changes
+  unitPrice Decimal  @db.Decimal(10, 2)
+
+  order     Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  product   Product  @relation(fields: [productId], references: [id])
+}
+
+model Payment {
+  id               String        @id @default(uuid())
+  // Structurally guarantees only one payment record exists per order
+  orderId          String        @unique
+  status           PaymentStatus @default(PENDING)
+  // Separate idempotency key namespace to prevent duplicate payment submissions or retries
+  idempotencyKey   String        @unique
+  simulatedOutcome String?
+  createdAt        DateTime      @default(now())
+  updatedAt        DateTime      @updatedAt
+
+  order            Order         @relation(fields: [orderId], references: [id])
+}
+
+model Reservation {
+  id        String            @id @default(uuid())
+  orderId   String
+  productId String
+  quantity  Int
+  status    ReservationStatus @default(ACTIVE)
+  expiresAt DateTime
+  releasedAt DateTime?
+  createdAt DateTime          @default(now())
+
+  order     Order             @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  product   Product           @relation(fields: [productId], references: [id])
+
+  // Fast lookup of active reservations by product ID for stock availability calculations
+  @@index([productId, status])
+  // Fast lookup for the background sweeper job to locate expired active reservations
+  @@index([status, expiresAt])
 }
