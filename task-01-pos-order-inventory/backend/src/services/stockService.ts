@@ -1,8 +1,10 @@
 import { prisma } from '../config/index.js';
-import { Prisma } from '@prisma/client';
+import PrismaClientPkg from '@prisma/client';
 import { ConflictError } from '../utils/errors.js';
 
-export type TransactionClient = Prisma.TransactionClient;
+const { Prisma } = PrismaClientPkg;
+
+export type TransactionClient = Parameters<Parameters<typeof prisma.$transaction>[0]>[0];
 
 const MAX_RETRIES = 5;
 

@@ -1,6 +1,8 @@
 import { prisma } from '../config/index.js';
-import { OrderStatus } from '@prisma/client';
+import PrismaClientPkg from '@prisma/client';
 import { reservationService } from '../services/reservationService.js';
+
+const { OrderStatus } = PrismaClientPkg;
 import { transitionOrderStatus } from '../services/orderStateMachine.js';
 
 let sweeperIntervalTimer: NodeJS.Timeout | null = null;

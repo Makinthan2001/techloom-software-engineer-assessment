@@ -4,10 +4,13 @@
  * ever changes Order.status — no other file should ever write order.status = X directly.
  */
 
-import { OrderStatus, Prisma } from '@prisma/client';
+import PrismaClientPkg from '@prisma/client';
 import { InvalidStateTransitionError } from '../utils/errors.js';
 
-export type TransactionClient = Prisma.TransactionClient;
+const OrderStatus = PrismaClientPkg.OrderStatus;
+type OrderStatus = typeof OrderStatus[keyof typeof OrderStatus];
+
+export type TransactionClient = Parameters<Parameters<typeof PrismaClientPkg.PrismaClient.prototype.$transaction>[0]>[0];
 
 /**
  * Adjacency list defining all valid OrderStatus state transitions per instruction.txt Section 11:

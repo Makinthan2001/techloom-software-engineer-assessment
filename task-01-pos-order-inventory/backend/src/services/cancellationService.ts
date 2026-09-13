@@ -1,6 +1,8 @@
 import { prisma } from '../config/index.js';
-import { OrderStatus } from '@prisma/client';
+import PrismaClientPkg from '@prisma/client';
 import { runInStockSafeTransaction } from './stockService.js';
+
+const { OrderStatus } = PrismaClientPkg;
 import { reservationService } from './reservationService.js';
 import { transitionOrderStatus } from './orderStateMachine.js';
 import {
