@@ -7,10 +7,32 @@ import { requestLogger } from './middleware/requestLogger.js';
 
 const app = express();
 
-// 1. CORS middleware (configured via CORS_ORIGIN env variable)
+// 1. CORS middleware (configured via CORS_ORIGIN env variable with local dev fallback)
+const getAllowedOrigins = (): string[] => {
+  const envOrigin = process.env.CORS_ORIGIN || env.CORS_ORIGIN || '';
+  const parsedOrigins = envOrigin
+    .split(',')
+    .map((o) => o.trim().replace(/\/$/, ''))
+    .filter(Boolean);
+
+  const localDefaults = ['http://localhost:3000', 'http://localhost:5173'];
+  return Array.from(new Set([...parsedOrigins, ...localDefaults]));
+};
+
 app.use(
   cors({
-    origin: env.CORS_ORIGIN,
+    origin: (origin, callback) => {
+      if (!origin) return callback(null, true);
+
+      const allowed = getAllowedOrigins();
+      const normalizedOrigin = origin.replace(/\/$/, '');
+
+      if (allowed.includes(normalizedOrigin)) {
+        return callback(null, true);
+      }
+
+      return callback(null, false);
+    },
     credentials: true,
   })
 );
