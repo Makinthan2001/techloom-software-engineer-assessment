@@ -4,7 +4,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import Link from 'next/link';
 import ProtectedRoute from '../../components/ProtectedRoute';
 import { useAuth } from '../../lib/auth';
-import { apiFetch } from '../../lib/api';
+import { orderService } from '../../services/order.service';
 import Toast, { ToastMessage } from '../../components/Toast';
 
 interface OrderItem {
@@ -26,11 +26,12 @@ export default function OrdersPage() {
   const [toast, setToast] = useState<ToastMessage | null>(null);
   const [statusFilter, setStatusFilter] = useState<string>('ALL');
   const [cancellingId, setCancellingId] = useState<string | null>(null);
+  const [confirmCancelId, setConfirmCancelId] = useState<string | null>(null);
 
   const fetchOrders = useCallback(async () => {
     try {
       setLoading(true);
-      const res = await apiFetch('/api/orders');
+      const res = await orderService.getOrders();
       if (res.ok && res.data?.data) {
         setOrders(res.data.data);
       } else {
@@ -53,14 +54,16 @@ export default function OrdersPage() {
     fetchOrders();
   }, [fetchOrders]);
 
-  const handleCancelOrder = async (orderId: string) => {
-    if (!confirm('Are you sure you want to cancel this order? Stock will be restored.')) return;
+  const handleCancelOrder = async () => {
+    if (!confirmCancelId) return;
+    const orderId = confirmCancelId;
+    setConfirmCancelId(null);
 
     setCancellingId(orderId);
     setToast(null);
 
     try {
-      const res = await apiFetch(`/api/orders/${orderId}/cancel`, { method: 'POST' });
+      const res = await orderService.cancelOrder(orderId);
       if (!res.ok) {
         throw new Error(
           res.status === 403
@@ -92,7 +95,7 @@ export default function OrdersPage() {
         <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-md">
           <div>
             <div className="flex items-center space-x-3">
-              <h1 className="text-2xl font-bold text-white">Order History</h1>
+              <h1 className="text-2xl font-bold text-white">Order Management</h1>
               <span
                 className={`text-xs font-semibold px-2.5 py-0.5 rounded-full ${
                   user?.role === 'ADMIN'
@@ -140,41 +143,39 @@ export default function OrdersPage() {
           </div>
         ) : filteredOrders.length === 0 ? (
           <div className="bg-slate-900 border border-slate-800 rounded-2xl p-12 text-center text-slate-400">
-            No orders found matching status filter '{statusFilter}'.
+            No orders found matching the selected filter.
           </div>
         ) : (
-          <div className="bg-slate-900 border border-slate-800 rounded-2xl overflow-hidden shadow-xl">
+          <div className="bg-slate-900 border border-slate-800 rounded-2xl overflow-hidden shadow-md">
             <div className="overflow-x-auto">
-              <table className="w-full text-left border-collapse">
-                <thead>
-                  <tr className="bg-slate-950/60 text-slate-400 text-xs font-bold uppercase tracking-wider border-b border-slate-800">
+              <table className="w-full text-left text-sm text-slate-300">
+                <thead className="bg-slate-950/60 text-slate-400 text-xs font-semibold uppercase tracking-wider border-b border-slate-800">
+                  <tr>
                     <th className="p-4">Order ID</th>
-                    <th className="p-4">Placed At</th>
-                    {user?.role === 'ADMIN' && <th className="p-4">User</th>}
-                    <th className="p-4">Status</th>
+                    <th className="p-4">User ID</th>
+                    <th className="p-4">Date</th>
+                    <th className="p-4 text-center">Status</th>
                     <th className="p-4 text-right">Total Amount</th>
                     <th className="p-4 text-right">Actions</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-slate-800/80 text-sm">
+                <tbody className="divide-y divide-slate-800/60">
                   {filteredOrders.map((ord) => {
                     const isCancelling = cancellingId === ord.id;
                     return (
                       <tr key={ord.id} className="hover:bg-slate-800/40 transition">
-                        <td className="p-4 font-mono text-blue-400 font-bold text-xs">
+                        <td className="p-4 font-mono font-semibold text-white">
                           #{ord.id.slice(0, 8)}
                         </td>
-                        <td className="p-4 text-slate-300 text-xs">
+                        <td className="p-4 font-mono text-xs text-slate-400">
+                          {ord.userId.slice(0, 8)}...
+                        </td>
+                        <td className="p-4 text-xs text-slate-400">
                           {new Date(ord.createdAt).toLocaleString()}
                         </td>
-                        {user?.role === 'ADMIN' && (
-                          <td className="p-4 text-slate-300 text-xs font-medium">
-                            {ord.user?.name || ord.userId.slice(0, 8)}
-                          </td>
-                        )}
-                        <td className="p-4">
+                        <td className="p-4 text-center">
                           <span
-                            className={`text-xs font-extrabold px-2.5 py-0.5 rounded-full border ${
+                            className={`text-xs font-bold px-2.5 py-1 rounded-full border ${
                               ord.status === 'PAID'
                                 ? 'bg-emerald-950 text-emerald-300 border-emerald-800'
                                 : ord.status === 'RESERVED'
@@ -188,7 +189,7 @@ export default function OrdersPage() {
                           </span>
                         </td>
                         <td className="p-4 text-right font-bold text-white">
-                          ${Number(ord.totalAmount).toFixed(2)}
+                          Rs. {Number(ord.totalAmount).toFixed(2)}
                         </td>
                         <td className="p-4 text-right space-x-2">
                           <Link
@@ -200,7 +201,7 @@ export default function OrdersPage() {
 
                           {(ord.status === 'RESERVED' || ord.status === 'PAID') && (
                             <button
-                              onClick={() => handleCancelOrder(ord.id)}
+                              onClick={() => setConfirmCancelId(ord.id)}
                               disabled={isCancelling}
                               className="px-3 py-1.5 bg-red-950/60 hover:bg-red-900 disabled:opacity-40 text-red-300 border border-red-800/60 text-xs font-semibold rounded-lg transition cursor-pointer"
                             >
@@ -213,6 +214,46 @@ export default function OrdersPage() {
                   })}
                 </tbody>
               </table>
+            </div>
+          </div>
+        )}
+
+        {/* Cancel Confirmation Modal */}
+        {confirmCancelId && (
+          <div className="fixed inset-0 z-50 bg-black/75 backdrop-blur-sm flex items-center justify-center p-4">
+            <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 w-full max-w-md shadow-2xl space-y-4">
+              <div className="flex items-center space-x-3">
+                <div className="w-10 h-10 rounded-full bg-amber-950/80 border border-amber-800/80 text-amber-400 flex items-center justify-center shrink-0">
+                  <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                  </svg>
+                </div>
+                <div>
+                  <h3 className="text-lg font-bold text-white">Cancel Order</h3>
+                  <p className="text-xs text-slate-400">Order #{confirmCancelId.slice(0, 8)}</p>
+                </div>
+              </div>
+
+              <p className="text-sm text-slate-300 bg-slate-950/50 p-3 rounded-xl border border-slate-800">
+                Are you sure you want to cancel this order? Any reserved inventory stock will be restored immediately.
+              </p>
+
+              <div className="flex items-center justify-end space-x-3 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setConfirmCancelId(null)}
+                  className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 text-sm font-semibold rounded-xl transition cursor-pointer"
+                >
+                  Keep Order
+                </button>
+                <button
+                  type="button"
+                  onClick={handleCancelOrder}
+                  className="px-4 py-2 bg-red-600 hover:bg-red-500 text-white text-sm font-semibold rounded-xl transition cursor-pointer shadow-lg shadow-red-600/30"
+                >
+                  Confirm Cancellation
+                </button>
+              </div>
             </div>
           </div>
         )}

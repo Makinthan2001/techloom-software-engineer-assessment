@@ -114,22 +114,30 @@ export default function LoginPage() {
           <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-3 text-center">
             Quick Demo Accounts
           </p>
-          <div className="grid grid-cols-2 gap-2">
+          <div className="grid grid-cols-3 gap-2">
             <button
               type="button"
-              onClick={() => setDemoCredentials('admin@techloom.ai', 'Admin@123456')}
-              className="px-3 py-2 rounded-lg bg-purple-950/40 hover:bg-purple-900/60 border border-purple-800/60 text-purple-300 text-xs font-medium transition cursor-pointer text-left"
+              onClick={() => setDemoCredentials('admin@gmail.com', 'admin123')}
+              className="px-2.5 py-2.5 rounded-xl bg-purple-950/40 hover:bg-purple-900/60 border border-purple-800/60 text-purple-300 text-xs font-medium transition cursor-pointer text-left"
             >
               <div className="font-semibold text-purple-200">ADMIN</div>
-              <div className="truncate text-slate-400">admin@techloom.ai</div>
+              <div className="truncate text-slate-400">admin@gmail.com</div>
             </button>
             <button
               type="button"
-              onClick={() => setDemoCredentials('cashier@techloom.ai', 'Cashier@123456')}
-              className="px-3 py-2 rounded-lg bg-blue-950/40 hover:bg-blue-900/60 border border-blue-800/60 text-blue-300 text-xs font-medium transition cursor-pointer text-left"
+              onClick={() => setDemoCredentials('user1@gmail.com', 'user123')}
+              className="px-2.5 py-2.5 rounded-xl bg-blue-950/40 hover:bg-blue-900/60 border border-blue-800/60 text-blue-300 text-xs font-medium transition cursor-pointer text-left"
             >
-              <div className="font-semibold text-blue-200">CASHIER</div>
-              <div className="truncate text-slate-400">cashier@techloom.ai</div>
+              <div className="font-semibold text-blue-200">USER 1</div>
+              <div className="truncate text-slate-400">user1@gmail.com</div>
+            </button>
+            <button
+              type="button"
+              onClick={() => setDemoCredentials('user2@gmail.com', 'user2123')}
+              className="px-2.5 py-2.5 rounded-xl bg-blue-950/40 hover:bg-blue-900/60 border border-blue-800/60 text-blue-300 text-xs font-medium transition cursor-pointer text-left"
+            >
+              <div className="font-semibold text-blue-200">USER 2</div>
+              <div className="truncate text-slate-400">user2@gmail.com</div>
             </button>
           </div>
         </div>

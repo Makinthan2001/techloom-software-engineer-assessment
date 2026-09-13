@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import ProtectedRoute from '../../components/ProtectedRoute';
 import { useCart } from '../../lib/cartContext';
-import { apiFetch } from '../../lib/api';
+import { checkoutService } from '../../services/checkout.service';
 import CountdownTimer from '../../components/CountdownTimer';
 import Toast, { ToastMessage } from '../../components/Toast';
 
@@ -41,12 +41,9 @@ export default function CheckoutPage() {
     const idempotencyKey = `chk-ui-${crypto.randomUUID()}`;
 
     try {
-      const res = await apiFetch('/api/checkout', {
-        method: 'POST',
-        body: JSON.stringify({
-          cartId: cart.id,
-          idempotencyKey,
-        }),
+      const res = await checkoutService.processCheckout({
+        cartId: cart.id,
+        idempotencyKey,
       });
 
       if (!res.ok) {
@@ -120,7 +117,7 @@ export default function CheckoutPage() {
               <div>
                 <span className="text-slate-400 text-xs font-semibold block">Total Amount</span>
                 <span className="text-3xl font-black text-white">
-                  ${Number(createdOrder.totalAmount).toFixed(2)}
+                  Rs. {Number(createdOrder.totalAmount).toFixed(2)}
                 </span>
               </div>
 
@@ -172,11 +169,11 @@ export default function CheckoutPage() {
                       <div>
                         <div className="font-semibold text-white">{item.product.name}</div>
                         <div className="text-xs text-slate-400">
-                          ${Number(item.product.price).toFixed(2)} × {item.quantity}
+                          Rs. {Number(item.product.price).toFixed(2)} × {item.quantity}
                         </div>
                       </div>
                       <div className="font-bold text-slate-200">
-                        ${(Number(item.product.price) * item.quantity).toFixed(2)}
+                        Rs. {(Number(item.product.price) * item.quantity).toFixed(2)}
                       </div>
                     </div>
                   ))}
@@ -188,7 +185,7 @@ export default function CheckoutPage() {
                       Total Order Amount
                     </span>
                     <span className="text-3xl font-black text-blue-400">
-                      ${totalAmount.toFixed(2)}
+                      Rs. {totalAmount.toFixed(2)}
                     </span>
                   </div>
 

@@ -4,7 +4,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import ProtectedRoute from '../../../components/ProtectedRoute';
-import { apiFetch } from '../../../lib/api';
+import { orderService } from '../../../services/order.service';
 import CountdownTimer from '../../../components/CountdownTimer';
 import Toast, { ToastMessage } from '../../../components/Toast';
 
@@ -40,7 +40,7 @@ export default function PaymentPage() {
   const fetchOrder = useCallback(async () => {
     try {
       setLoading(true);
-      const res = await apiFetch(`/api/orders/${orderId}`);
+      const res = await orderService.getOrderById(orderId);
       if (res.ok && res.data?.data) {
         setOrder(res.data.data);
       } else {
@@ -73,12 +73,9 @@ export default function PaymentPage() {
     const idempotencyKey = `pay-ui-${crypto.randomUUID()}`;
 
     try {
-      const res = await apiFetch(`/api/orders/${orderId}/payment`, {
-        method: 'POST',
-        body: JSON.stringify({
-          outcome,
-          idempotencyKey,
-        }),
+      const res = await orderService.processPayment(orderId, {
+        outcome,
+        idempotencyKey,
       });
 
       if (!res.ok) {
@@ -174,7 +171,7 @@ export default function PaymentPage() {
                   <div key={item.id} className="py-2.5 flex items-center justify-between text-sm">
                     <span className="text-slate-200 font-medium">{item.product.name}</span>
                     <span className="text-slate-400">
-                      {item.quantity} × ${Number(item.unitPrice).toFixed(2)} = ${' '}
+                      {item.quantity} × Rs. {Number(item.unitPrice).toFixed(2)} = Rs.{' '}
                       {(item.quantity * Number(item.unitPrice)).toFixed(2)}
                     </span>
                   </div>
@@ -184,7 +181,7 @@ export default function PaymentPage() {
               <div className="pt-3 border-t border-slate-800 flex items-center justify-between">
                 <span className="text-slate-400 text-sm font-semibold">Total Amount Due</span>
                 <span className="text-3xl font-black text-white">
-                  ${Number(order.totalAmount).toFixed(2)}
+                  Rs. {Number(order.totalAmount).toFixed(2)}
                 </span>
               </div>
             </div>

@@ -59,7 +59,7 @@ export default function CartPage() {
                         <div className="space-y-1">
                           <h3 className="font-bold text-white text-lg">{item.product.name}</h3>
                           <p className="text-sm text-blue-400 font-semibold">
-                            ${Number(item.product.price).toFixed(2)} each
+                            Rs. {Number(item.product.price).toFixed(2)} each
                           </p>
                         </div>
 
@@ -85,7 +85,7 @@ export default function CartPage() {
 
                           <div className="text-right">
                             <div className="text-lg font-extrabold text-white">
-                              ${lineTotal.toFixed(2)}
+                              Rs. {lineTotal.toFixed(2)}
                             </div>
                             <button
                               onClick={() => removeItem(item.id)}
@@ -115,12 +115,12 @@ export default function CartPage() {
                 </div>
                 <div className="flex justify-between text-slate-400">
                   <span>Subtotal</span>
-                  <span className="font-semibold text-white">${totalAmount.toFixed(2)}</span>
+                  <span className="font-semibold text-white">Rs. {totalAmount.toFixed(2)}</span>
                 </div>
                 <div className="pt-3 border-t border-slate-800 flex justify-between items-center">
                   <span className="text-base font-bold text-white">Estimated Total</span>
                   <span className="text-2xl font-black text-blue-400">
-                    ${totalAmount.toFixed(2)}
+                    Rs. {totalAmount.toFixed(2)}
                   </span>
                 </div>
               </div>

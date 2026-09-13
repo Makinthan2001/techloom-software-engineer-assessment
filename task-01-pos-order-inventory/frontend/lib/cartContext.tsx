@@ -1,7 +1,7 @@
 'use client';
 
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
-import { apiFetch } from './api';
+import { cartService } from '../services/cart.service';
 import { useAuth } from './auth';
 
 export interface CartItem {
@@ -43,12 +43,12 @@ const CART_STORAGE_KEY = 'pos_active_cart_id';
 export function CartProvider({ children }: { children: React.ReactNode }) {
   const [cart, setCart] = useState<Cart | null>(null);
   const [loading, setLoading] = useState<boolean>(false);
-  const { isAuthenticated } = useAuth();
+  const { isAuthenticated, isLoading: authLoading } = useAuth();
 
   const fetchCartById = useCallback(async (cartId: string) => {
     try {
       setLoading(true);
-      const res = await apiFetch(`/api/carts/${cartId}`);
+      const res = await cartService.getCart(cartId);
       if (res.ok && res.data?.data) {
         if (res.data.data.status === 'CONVERTED') {
           localStorage.removeItem(CART_STORAGE_KEY);
@@ -69,6 +69,8 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   useEffect(() => {
+    if (authLoading) return;
+
     if (isAuthenticated) {
       const savedCartId = localStorage.getItem(CART_STORAGE_KEY);
       if (savedCartId) {
@@ -78,12 +80,12 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
       setCart(null);
       localStorage.removeItem(CART_STORAGE_KEY);
     }
-  }, [isAuthenticated, fetchCartById]);
+  }, [isAuthenticated, authLoading, fetchCartById]);
 
   const ensureActiveCart = async (): Promise<string> => {
     const existingCartId = cart?.id || localStorage.getItem(CART_STORAGE_KEY);
     if (!existingCartId || cart?.status === 'CONVERTED') {
-      const createRes = await apiFetch('/api/carts', { method: 'POST' });
+      const createRes = await cartService.createCart();
       if (!createRes.ok || !createRes.data?.data?.id) {
         throw new Error(createRes.data?.message || 'Failed to create active cart');
       }
@@ -96,10 +98,7 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
 
   const addItem = async (productId: string, quantity: number) => {
     const activeCartId = await ensureActiveCart();
-    const res = await apiFetch(`/api/carts/${activeCartId}/items`, {
-      method: 'POST',
-      body: JSON.stringify({ productId, quantity }),
-    });
+    const res = await cartService.addItem(activeCartId, { productId, quantity });
 
     if (!res.ok) {
       throw new Error(res.data?.message || 'Failed to add item to cart');
@@ -110,10 +109,7 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
 
   const updateQuantity = async (itemId: string, quantity: number) => {
     if (!cart) return;
-    const res = await apiFetch(`/api/carts/${cart.id}/items/${itemId}`, {
-      method: 'PATCH',
-      body: JSON.stringify({ quantity }),
-    });
+    const res = await cartService.updateItem(cart.id, itemId, { quantity });
 
     if (!res.ok) {
       throw new Error(res.data?.message || 'Failed to update item quantity');
@@ -124,9 +120,7 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
 
   const removeItem = async (itemId: string) => {
     if (!cart) return;
-    const res = await apiFetch(`/api/carts/${cart.id}/items/${itemId}`, {
-      method: 'DELETE',
-    });
+    const res = await cartService.removeItem(cart.id, itemId);
 
     if (!res.ok) {
       throw new Error(res.data?.message || 'Failed to remove item from cart');

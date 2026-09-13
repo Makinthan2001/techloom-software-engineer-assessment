@@ -5,7 +5,8 @@ import Link from 'next/link';
 import ProtectedRoute from '../../components/ProtectedRoute';
 import { useAuth } from '../../lib/auth';
 import { useCart } from '../../lib/cartContext';
-import { apiFetch } from '../../lib/api';
+import { productService } from '../../services/product.service';
+import { orderService } from '../../services/order.service';
 
 interface Product {
   id: string;
@@ -33,8 +34,8 @@ export default function DashboardPage() {
     try {
       setLoading(true);
       const [prodRes, orderRes] = await Promise.all([
-        apiFetch('/api/products'),
-        apiFetch('/api/orders'),
+        productService.getProducts(),
+        orderService.getOrders(),
       ]);
 
       if (prodRes.ok && prodRes.data?.data) {
@@ -233,7 +234,7 @@ export default function DashboardPage() {
                   </div>
                   <p className="text-slate-400 text-xs mt-1">
                     {itemCount > 0
-                      ? `Active cart total: $${totalAmount.toFixed(2)}`
+                      ? `Active cart total: Rs. ${totalAmount.toFixed(2)}`
                       : 'No active cart in progress.'}
                   </p>
                 </div>
@@ -243,7 +244,7 @@ export default function DashboardPage() {
                     href="/cart"
                     className="py-2.5 px-4 bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-center text-xs rounded-xl transition block"
                   >
-                    View & Edit Cart (${totalAmount.toFixed(2)}) →
+                    View & Edit Cart (Rs. {totalAmount.toFixed(2)}) →
                   </Link>
                 ) : (
                   <Link
@@ -292,7 +293,7 @@ export default function DashboardPage() {
                           {ord.status}
                         </span>
                         <span className="font-bold text-white">
-                          ${Number(ord.totalAmount).toFixed(2)}
+                          Rs. {Number(ord.totalAmount).toFixed(2)}
                         </span>
                       </div>
                     </div>

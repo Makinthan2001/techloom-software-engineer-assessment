@@ -15,10 +15,16 @@ export function setOnAuthFailed(callback: () => void) {
   onAuthFailedCallback = callback;
 }
 
+export interface ApiResponse<T = any> {
+  ok: boolean;
+  status: number;
+  data: T;
+}
+
 export async function apiFetch<T = any>(
   endpoint: string,
   options: RequestInit & { _isRetry?: boolean } = {}
-): Promise<{ ok: boolean; status: number; data: T }> {
+): Promise<ApiResponse<T>> {
   const url = endpoint.startsWith('http') ? endpoint : `${API_BASE_URL}${endpoint}`;
 
   const headers: Record<string, string> = {
@@ -85,32 +91,65 @@ export async function apiFetch<T = any>(
   }
 }
 
+let refreshPromise: Promise<boolean> | null = null;
+
 /**
-  * Refreshes access token via HttpOnly refresh cookie POST /api/auth/refresh
-  */
+ * Refreshes access token via HttpOnly refresh cookie or localStorage fallback POST /api/auth/refresh
+ */
 export async function refreshToken(): Promise<boolean> {
-  try {
-    const res = await fetch(`${API_BASE_URL}/api/auth/refresh`, {
-      method: 'POST',
-      credentials: 'include',
-      headers: { 'Content-Type': 'application/json' },
-    });
-
-    if (!res.ok) {
-      setAccessToken(null);
-      return false;
-    }
-
-    const data = await res.json();
-    if (data?.data?.accessToken) {
-      setAccessToken(data.data.accessToken);
-      return true;
-    }
-
-    setAccessToken(null);
-    return false;
-  } catch {
-    setAccessToken(null);
-    return false;
+  if (refreshPromise) {
+    return refreshPromise;
   }
+
+  refreshPromise = (async () => {
+    try {
+      const storedRefreshToken =
+        typeof window !== 'undefined' ? localStorage.getItem('refreshToken') : null;
+
+      const fetchOptions: RequestInit = {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+      };
+
+      if (storedRefreshToken) {
+        fetchOptions.body = JSON.stringify({ refreshToken: storedRefreshToken });
+      }
+
+      const res = await fetch(`${API_BASE_URL}/api/auth/refresh`, fetchOptions);
+
+      if (!res.ok) {
+        setAccessToken(null);
+        if (typeof window !== 'undefined') {
+          localStorage.removeItem('refreshToken');
+        }
+        return false;
+      }
+
+      const data = await res.json();
+      if (data?.data?.accessToken) {
+        setAccessToken(data.data.accessToken);
+        if (data?.data?.refreshToken && typeof window !== 'undefined') {
+          localStorage.setItem('refreshToken', data.data.refreshToken);
+        }
+        return true;
+      }
+
+      setAccessToken(null);
+      if (typeof window !== 'undefined') {
+        localStorage.removeItem('refreshToken');
+      }
+      return false;
+    } catch {
+      setAccessToken(null);
+      if (typeof window !== 'undefined') {
+        localStorage.removeItem('refreshToken');
+      }
+      return false;
+    } finally {
+      refreshPromise = null;
+    }
+  })();
+
+  return refreshPromise;
 }
