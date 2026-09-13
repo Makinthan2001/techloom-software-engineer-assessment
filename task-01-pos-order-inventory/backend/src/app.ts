@@ -9,14 +9,19 @@ const app = express();
 
 // 1. CORS middleware (configured via CORS_ORIGIN env variable with local dev fallback)
 const getAllowedOrigins = (): string[] => {
-  const envOrigin = process.env.CORS_ORIGIN || env.CORS_ORIGIN || '';
-  const parsedOrigins = envOrigin
+  const rawOrigin = process.env.CORS_ORIGIN || env.CORS_ORIGIN || '';
+  const configuredOrigins = rawOrigin
     .split(',')
     .map((o) => o.trim().replace(/\/$/, ''))
     .filter(Boolean);
 
-  const localDefaults = ['http://localhost:3000', 'http://localhost:5173'];
-  return Array.from(new Set([...parsedOrigins, ...localDefaults]));
+  const isProd = (process.env.NODE_ENV || env.NODE_ENV) === 'production';
+  if (!isProd) {
+    const localDefaults = ['http://localhost:3000', 'http://localhost:5173'];
+    return Array.from(new Set([...configuredOrigins, ...localDefaults]));
+  }
+
+  return configuredOrigins;
 };
 
 app.use(
