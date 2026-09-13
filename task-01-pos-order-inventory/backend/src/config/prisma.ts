@@ -1,14 +1,16 @@
-import { PrismaClient } from '@prisma/client';
+import PrismaClientPkg from '@prisma/client';
 import { PrismaPg } from '@prisma/adapter-pg';
 import pg from 'pg';
 import { env } from './env.js';
+
+const { PrismaClient } = PrismaClientPkg;
 
 const pool = new pg.Pool({ connectionString: env.DATABASE_URL, max: 20 });
 const adapter = new PrismaPg(pool);
 
 declare global {
   // eslint-disable-next-line no-var
-  var prismaSingleton: PrismaClient | undefined;
+  var prismaSingleton: InstanceType<typeof PrismaClient> | undefined;
 }
 
 export const prisma =
