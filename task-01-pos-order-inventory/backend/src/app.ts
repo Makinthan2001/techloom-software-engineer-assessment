@@ -7,21 +7,25 @@ import { requestLogger } from './middleware/requestLogger.js';
 
 const app = express();
 
-// 1. CORS middleware (configured via CORS_ORIGIN env variable with local dev fallback)
+// 1. CORS middleware (configured via CORS_ORIGIN env variable)
 const getAllowedOrigins = (): string[] => {
+  const isProduction =
+    process.env.NODE_ENV === 'production' ||
+    env.NODE_ENV === 'production' ||
+    process.env.VERCEL_ENV === 'production';
+
   const rawOrigin = process.env.CORS_ORIGIN || env.CORS_ORIGIN || '';
   const configuredOrigins = rawOrigin
     .split(',')
-    .map((o) => o.trim().replace(/\/$/, ''))
+    .map((o) => o.trim().replace(/\/+$/, ''))
     .filter(Boolean);
 
-  const isProd = (process.env.NODE_ENV || env.NODE_ENV) === 'production';
-  if (!isProd) {
-    const localDefaults = ['http://localhost:3000', 'http://localhost:5173'];
-    return Array.from(new Set([...configuredOrigins, ...localDefaults]));
+  if (isProduction) {
+    return configuredOrigins;
   }
 
-  return configuredOrigins;
+  const localDefaults = ['http://localhost:3000', 'http://localhost:5173'];
+  return Array.from(new Set([...configuredOrigins, ...localDefaults]));
 };
 
 app.use(
@@ -30,7 +34,7 @@ app.use(
       if (!origin) return callback(null, true);
 
       const allowed = getAllowedOrigins();
-      const normalizedOrigin = origin.replace(/\/$/, '');
+      const normalizedOrigin = origin.trim().replace(/\/+$/, '');
 
       if (allowed.includes(normalizedOrigin)) {
         return callback(null, true);
