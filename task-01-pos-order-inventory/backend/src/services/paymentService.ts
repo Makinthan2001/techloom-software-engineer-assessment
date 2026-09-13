@@ -1,6 +1,12 @@
 import { prisma } from '../config/index.js';
-import { OrderStatus, PaymentStatus, Prisma } from '@prisma/client';
+import PrismaClientPkg from '@prisma/client';
 import { runInStockSafeTransaction } from './stockService.js';
+
+const OrderStatus = PrismaClientPkg.OrderStatus;
+type OrderStatus = typeof OrderStatus[keyof typeof OrderStatus];
+
+const PaymentStatus = PrismaClientPkg.PaymentStatus;
+type PaymentStatus = typeof PaymentStatus[keyof typeof PaymentStatus];
 import { reservationService } from './reservationService.js';
 import { transitionOrderStatus } from './orderStateMachine.js';
 import {

@@ -1,6 +1,9 @@
 import { describe, it, expect, beforeAll, beforeEach } from 'vitest';
 import { prisma } from '../../src/config/prisma.js';
-import { OrderStatus } from '@prisma/client';
+import PrismaClientPkg from '@prisma/client';
+
+const { OrderStatus } = PrismaClientPkg;
+type OrderStatus = (typeof OrderStatus)[keyof typeof OrderStatus];
 import {
   transitionOrderStatus,
   ALLOWED_TRANSITIONS,

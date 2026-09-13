@@ -1,9 +1,11 @@
 import { prisma } from '../config/index.js';
-import { Prisma, ReservationStatus, OrderStatus } from '@prisma/client';
+import PrismaClientPkg from '@prisma/client';
 import { stockService, runInStockSafeTransaction } from './stockService.js';
 import { transitionOrderStatus } from './orderStateMachine.js';
 
-export type TransactionClient = Prisma.TransactionClient;
+const { ReservationStatus, OrderStatus } = PrismaClientPkg;
+
+export type TransactionClient = Parameters<Parameters<typeof prisma.$transaction>[0]>[0];
 
 export const reservationService = {
   /**
