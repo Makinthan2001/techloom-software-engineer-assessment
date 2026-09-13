@@ -4,7 +4,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import ProtectedRoute from '../../../components/ProtectedRoute';
-import { apiFetch } from '../../../lib/api';
+import { orderService } from '../../../services/order.service';
 import CountdownTimer from '../../../components/CountdownTimer';
 import Toast, { ToastMessage } from '../../../components/Toast';
 
@@ -44,11 +44,12 @@ export default function OrderDetailPage() {
   const [loading, setLoading] = useState<boolean>(true);
   const [toast, setToast] = useState<ToastMessage | null>(null);
   const [cancelling, setCancelling] = useState<boolean>(false);
+  const [showCancelModal, setShowCancelModal] = useState<boolean>(false);
 
   const fetchOrderDetail = useCallback(async () => {
     try {
       setLoading(true);
-      const res = await apiFetch(`/api/orders/${id}`);
+      const res = await orderService.getOrderById(id);
       if (res.ok && res.data?.data) {
         setOrder(res.data.data);
       } else {
@@ -73,14 +74,13 @@ export default function OrderDetailPage() {
     }
   }, [id, fetchOrderDetail]);
 
-  const handleCancelOrder = async () => {
-    if (!confirm('Are you sure you want to cancel this order? Stock will be restored.')) return;
-
+  const confirmCancelOrder = async () => {
+    setShowCancelModal(false);
     setCancelling(true);
     setToast(null);
 
     try {
-      const res = await apiFetch(`/api/orders/${id}/cancel`, { method: 'POST' });
+      const res = await orderService.cancelOrder(id);
       if (!res.ok) {
         throw new Error(
           res.status === 403
@@ -108,15 +108,59 @@ export default function OrderDetailPage() {
   return (
     <ProtectedRoute>
       <div className="max-w-4xl mx-auto space-y-6">
-        {/* Header */}
-        <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-md">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-            <div>
-              <div className="flex items-center space-x-3">
-                <h1 className="text-2xl font-bold text-white">Order Details</h1>
-                {order && (
+        {/* Header Navigation */}
+        <div className="flex items-center justify-between">
+          <Link
+            href="/orders"
+            className="text-sm font-semibold text-slate-400 hover:text-white flex items-center space-x-1 transition"
+          >
+            <span>&larr; Back to Order History</span>
+          </Link>
+          <div className="flex items-center space-x-3">
+            {order && order.status === 'RESERVED' && (
+              <Link
+                href={`/payment/${order.id}`}
+                className="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white font-semibold text-xs rounded-xl shadow-lg transition"
+              >
+                Proceed to Payment &rarr;
+              </Link>
+            )}
+            {isCancelValid && (
+              <button
+                onClick={() => setShowCancelModal(true)}
+                disabled={cancelling}
+                className="px-4 py-2 bg-red-950/60 hover:bg-red-900 text-red-300 border border-red-800/60 font-semibold text-xs rounded-xl transition cursor-pointer"
+              >
+                {cancelling ? 'Cancelling...' : 'Cancel Order'}
+              </button>
+            )}
+          </div>
+        </div>
+
+        {/* Notification Toast */}
+        <Toast toast={toast} onDismiss={() => setToast(null)} />
+
+        {/* Loading State */}
+        {loading ? (
+          <div className="bg-slate-900 border border-slate-800 rounded-2xl p-12 text-center text-slate-400">
+            <div className="w-8 h-8 border-4 border-blue-500 border-t-transparent rounded-full animate-spin mx-auto mb-3" />
+            Loading order summary...
+          </div>
+        ) : !order ? (
+          <div className="bg-slate-900 border border-slate-800 rounded-2xl p-12 text-center text-slate-400">
+            Order not found or inaccessible.
+          </div>
+        ) : (
+          <div className="space-y-6">
+            {/* Order Status Banner */}
+            <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-md flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+              <div>
+                <div className="flex items-center space-x-3">
+                  <h1 className="text-2xl font-mono font-bold text-white">
+                    Order #{order.id.slice(0, 8)}
+                  </h1>
                   <span
-                    className={`text-xs font-extrabold px-3 py-1 rounded-full border ${
+                    className={`text-xs font-bold px-3 py-1 rounded-full border ${
                       order.status === 'PAID'
                         ? 'bg-emerald-950 text-emerald-300 border-emerald-800'
                         : order.status === 'RESERVED'
@@ -128,22 +172,15 @@ export default function OrderDetailPage() {
                   >
                     {order.status}
                   </span>
-                )}
+                </div>
+                <div className="text-xs text-slate-500 mt-1">
+                  Created at {new Date(order.createdAt).toLocaleString()}
+                </div>
               </div>
-              <p className="text-slate-400 text-sm font-mono mt-1">Order ID: {id}</p>
-            </div>
-
-            <div className="flex items-center space-x-3">
-              <Link
-                href="/orders"
-                className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-semibold rounded-xl transition"
-              >
-                ← Back to Orders
-              </Link>
 
               {isCancelValid && (
                 <button
-                  onClick={handleCancelOrder}
+                  onClick={() => setShowCancelModal(true)}
                   disabled={cancelling}
                   className="px-4 py-2 bg-red-950/80 hover:bg-red-900 disabled:opacity-40 text-red-300 border border-red-800 text-xs font-bold rounded-xl transition cursor-pointer"
                 >
@@ -151,23 +188,6 @@ export default function OrderDetailPage() {
                 </button>
               )}
             </div>
-          </div>
-        </div>
-
-        {/* Notification Toast */}
-        <Toast toast={toast} onDismiss={() => setToast(null)} />
-
-        {loading ? (
-          <div className="bg-slate-900 border border-slate-800 rounded-2xl p-12 text-center text-slate-400">
-            <div className="w-8 h-8 border-4 border-blue-500 border-t-transparent rounded-full animate-spin mx-auto mb-3" />
-            Loading order details...
-          </div>
-        ) : !order ? (
-          <div className="bg-slate-900 border border-slate-800 rounded-2xl p-12 text-center text-slate-400">
-            Order not found or permission denied.
-          </div>
-        ) : (
-          <div className="space-y-6">
             {/* Reservation Expiry Lock Card */}
             {order.status === 'RESERVED' && expiresAt && (
               <div className="bg-amber-950/40 border border-amber-800/80 rounded-2xl p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4 text-sm">
@@ -204,11 +224,11 @@ export default function OrderDetailPage() {
                     <div>
                       <div className="font-semibold text-white">{item.product.name}</div>
                       <div className="text-xs text-slate-400">
-                        ${Number(item.unitPrice).toFixed(2)} × {item.quantity}
+                        Rs. {Number(item.unitPrice).toFixed(2)} × {item.quantity}
                       </div>
                     </div>
                     <div className="font-bold text-white">
-                      ${(Number(item.unitPrice) * item.quantity).toFixed(2)}
+                      Rs. {(Number(item.unitPrice) * item.quantity).toFixed(2)}
                     </div>
                   </div>
                 ))}
@@ -217,7 +237,7 @@ export default function OrderDetailPage() {
               <div className="pt-4 border-t border-slate-800 flex items-center justify-between">
                 <span className="text-slate-400 font-semibold text-sm">Total Amount</span>
                 <span className="text-3xl font-black text-blue-400">
-                  ${Number(order.totalAmount).toFixed(2)}
+                  Rs. {Number(order.totalAmount).toFixed(2)}
                 </span>
               </div>
             </div>
@@ -254,6 +274,33 @@ export default function OrderDetailPage() {
                 </div>
               </div>
             )}
+          </div>
+        )}
+
+        {/* Cancel Order Confirmation Modal */}
+        {showCancelModal && (
+          <div className="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+            <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 max-w-md w-full space-y-4 shadow-2xl">
+              <h3 className="text-lg font-bold text-white">Cancel Order</h3>
+              <p className="text-sm text-slate-300">
+                Are you sure you want to cancel this order? Any reserved stock will be restored to inventory.
+              </p>
+              <div className="flex justify-end space-x-3 pt-2">
+                <button
+                  onClick={() => setShowCancelModal(false)}
+                  className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 font-semibold text-xs rounded-xl transition cursor-pointer"
+                >
+                  Keep Order
+                </button>
+                <button
+                  onClick={confirmCancelOrder}
+                  disabled={cancelling}
+                  className="px-4 py-2 bg-red-600 hover:bg-red-500 text-white font-semibold text-xs rounded-xl transition cursor-pointer"
+                >
+                  {cancelling ? 'Cancelling...' : 'Confirm Cancellation'}
+                </button>
+              </div>
+            </div>
           </div>
         )}
       </div>

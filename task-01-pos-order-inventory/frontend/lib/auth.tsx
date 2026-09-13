@@ -4,12 +4,12 @@ import React, { createContext, useContext, useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { User } from './types';
 import {
-  apiFetch,
   getAccessToken,
   setAccessToken,
   refreshToken,
   setOnAuthFailed,
 } from './api';
+import { authService } from '../services/auth.service';
 
 interface AuthContextType {
   user: User | null;
@@ -33,10 +33,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setOnAuthFailed(() => {
       setUser(null);
       setAccessTokenState(null);
+      if (typeof window !== 'undefined') {
+        localStorage.removeItem('refreshToken');
+      }
       router.push('/login');
     });
 
-    // On mount, perform silent refresh to check for active refresh cookie
+    // On mount, perform silent refresh to check for active refresh cookie/token
     async function initializeAuth() {
       try {
         const success = await refreshToken();
@@ -44,10 +47,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           const currentToken = getAccessToken();
           setAccessTokenState(currentToken);
 
-          // Fetch current user details via /api/auth/me (or decoded token)
-          const profileRes = await apiFetch('/api/auth/me');
+          // Fetch current user details via authService.getMe()
+          const profileRes = await authService.getMe();
           if (profileRes.ok && profileRes.data?.data) {
             setUser(profileRes.data.data);
+          } else {
+            setAccessToken(null);
+            setAccessTokenState(null);
+            setUser(null);
+            if (typeof window !== 'undefined') {
+              localStorage.removeItem('refreshToken');
+            }
           }
         }
       } catch (err) {
@@ -61,17 +71,18 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, [router]);
 
   const login = async (email: string, password: string): Promise<User> => {
-    const res = await apiFetch('/api/auth/login', {
-      method: 'POST',
-      body: JSON.stringify({ email, password }),
-    });
+    const res = await authService.login({ email, password });
 
     if (!res.ok) {
       const msg = res.data?.message || 'Invalid email or password';
       throw new Error(msg);
     }
 
-    const { user: userData, accessToken: token } = res.data.data;
+    const { user: userData, accessToken: token, refreshToken: refToken } = res.data.data;
+
+    if (refToken && typeof window !== 'undefined') {
+      localStorage.setItem('refreshToken', refToken);
+    }
 
     setAccessToken(token);
     setAccessTokenState(token);
@@ -82,10 +93,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const logout = async () => {
     try {
-      await apiFetch('/api/auth/logout', { method: 'POST' });
+      await authService.logout();
     } catch (err) {
       console.error('Logout error:', err);
     } finally {
+      if (typeof window !== 'undefined') {
+        localStorage.removeItem('refreshToken');
+      }
       setAccessToken(null);
       setAccessTokenState(null);
       setUser(null);

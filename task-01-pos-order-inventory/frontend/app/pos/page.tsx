@@ -5,7 +5,7 @@ import Link from 'next/link';
 import ProtectedRoute from '../../components/ProtectedRoute';
 import { useAuth } from '../../lib/auth';
 import { useCart } from '../../lib/cartContext';
-import { apiFetch } from '../../lib/api';
+import { productService } from '../../services/product.service';
 import Toast, { ToastMessage } from '../../components/Toast';
 
 interface Product {
@@ -28,7 +28,7 @@ export default function POSPage() {
   const fetchProducts = useCallback(async () => {
     try {
       setLoading(true);
-      const res = await apiFetch('/api/products');
+      const res = await productService.getProducts();
       if (res.ok && res.data?.data) {
         setProducts(res.data.data);
       } else {
@@ -156,7 +156,7 @@ export default function POSPage() {
                           </span>
                         </div>
                         <div className="text-xl font-bold text-blue-400 mb-3">
-                          ${Number(product.price).toFixed(2)}
+                          Rs. {Number(product.price).toFixed(2)}
                         </div>
                       </div>
 
@@ -204,7 +204,7 @@ export default function POSPage() {
                       <div className="truncate mr-2">
                         <div className="font-semibold text-white truncate">{item.product.name}</div>
                         <div className="text-xs text-slate-400">
-                          ${Number(item.product.price).toFixed(2)} × {item.quantity}
+                          Rs. {Number(item.product.price).toFixed(2)} × {item.quantity}
                         </div>
                       </div>
 
@@ -247,7 +247,7 @@ export default function POSPage() {
             <div className="pt-3 border-t border-slate-800 space-y-3">
               <div className="flex items-center justify-between">
                 <span className="text-sm text-slate-400">Running Total</span>
-                <span className="text-2xl font-black text-white">${totalAmount.toFixed(2)}</span>
+                <span className="text-2xl font-black text-white">Rs. {totalAmount.toFixed(2)}</span>
               </div>
 
               <div className="grid grid-cols-2 gap-2">

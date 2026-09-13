@@ -4,7 +4,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import ProtectedRoute from '../../components/ProtectedRoute';
 import { useAuth } from '../../lib/auth';
 import { useCart } from '../../lib/cartContext';
-import { apiFetch } from '../../lib/api';
+import { productService } from '../../services/product.service';
 import Toast, { ToastMessage } from '../../components/Toast';
 
 interface Product {
@@ -27,6 +27,7 @@ export default function ProductsPage() {
   // Modal State for Create / Edit Product
   const [showModal, setShowModal] = useState<boolean>(false);
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
+  const [deletingProduct, setDeletingProduct] = useState<{ id: string; name: string } | null>(null);
   const [formData, setFormData] = useState({ name: '', price: '', stock: '' });
   const [submitting, setSubmitting] = useState<boolean>(false);
   const [actionLoadingId, setActionLoadingId] = useState<string | null>(null);
@@ -34,7 +35,7 @@ export default function ProductsPage() {
   const fetchProducts = useCallback(async () => {
     try {
       setLoading(true);
-      const res = await apiFetch('/api/products');
+      const res = await productService.getProducts();
       if (res.ok && res.data?.data) {
         setProducts(res.data.data);
       } else {
@@ -83,11 +84,8 @@ export default function ProductsPage() {
 
     try {
       if (editingProduct) {
-        // Edit Product (PATCH /api/products/:id)
-        const res = await apiFetch(`/api/products/${editingProduct.id}`, {
-          method: 'PATCH',
-          body: JSON.stringify(payload),
-        });
+        // Edit Product
+        const res = await productService.updateProduct(editingProduct.id, payload);
 
         if (!res.ok) {
           throw new Error(
@@ -102,11 +100,8 @@ export default function ProductsPage() {
           message: res.data?.message || `Product '${payload.name}' updated successfully!`,
         });
       } else {
-        // Create Product (POST /api/products)
-        const res = await apiFetch('/api/products', {
-          method: 'POST',
-          body: JSON.stringify(payload),
-        });
+        // Create Product
+        const res = await productService.createProduct(payload);
 
         if (!res.ok) {
           throw new Error(
@@ -131,16 +126,20 @@ export default function ProductsPage() {
     }
   };
 
-  const handleDeleteProduct = async (productId: string, productName: string) => {
-    if (!confirm(`Are you sure you want to delete '${productName}'?`)) return;
+  const triggerDeleteProduct = (productId: string, productName: string) => {
+    setDeletingProduct({ id: productId, name: productName });
+  };
+
+  const confirmDeleteProduct = async () => {
+    if (!deletingProduct) return;
+    const { id: productId, name: productName } = deletingProduct;
+    setDeletingProduct(null);
 
     setActionLoadingId(productId);
     setToast(null);
 
     try {
-      const res = await apiFetch(`/api/products/${productId}`, {
-        method: 'DELETE',
-      });
+      const res = await productService.deleteProduct(productId);
 
       if (!res.ok) {
         throw new Error(
@@ -268,7 +267,7 @@ export default function ProductsPage() {
                     </div>
 
                     <div className="text-2xl font-extrabold text-blue-400 mb-4">
-                      ${Number(product.price).toFixed(2)}
+                      Rs. {Number(product.price).toFixed(2)}
                     </div>
                   </div>
 
@@ -295,7 +294,7 @@ export default function ProductsPage() {
                           Edit
                         </button>
                         <button
-                          onClick={() => handleDeleteProduct(product.id, product.name)}
+                          onClick={() => triggerDeleteProduct(product.id, product.name)}
                           disabled={isItemActionLoading}
                           className="px-3 py-1.5 bg-red-950/60 hover:bg-red-900 disabled:opacity-40 text-red-300 border border-red-800/60 text-xs font-semibold rounded-lg transition cursor-pointer"
                         >
@@ -335,7 +334,7 @@ export default function ProductsPage() {
 
                 <div>
                   <label className="block text-xs font-semibold text-slate-300 mb-1">
-                    Unit Price ($)
+                    Unit Price (Rs.)
                   </label>
                   <input
                     type="number"
@@ -389,6 +388,46 @@ export default function ProductsPage() {
                   </button>
                 </div>
               </form>
+            </div>
+          </div>
+        )}
+
+        {/* Delete Confirmation Modal */}
+        {deletingProduct && (
+          <div className="fixed inset-0 z-50 bg-black/75 backdrop-blur-sm flex items-center justify-center p-4">
+            <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 w-full max-w-md shadow-2xl space-y-4">
+              <div className="flex items-center space-x-3">
+                <div className="w-10 h-10 rounded-full bg-red-950/80 border border-red-800/80 text-red-400 flex items-center justify-center shrink-0">
+                  <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                  </svg>
+                </div>
+                <div>
+                  <h3 className="text-lg font-bold text-white">Delete Product</h3>
+                  <p className="text-xs text-slate-400">This action cannot be undone.</p>
+                </div>
+              </div>
+
+              <p className="text-sm text-slate-300 bg-slate-950/50 p-3 rounded-xl border border-slate-800">
+                Are you sure you want to delete <span className="font-semibold text-white">'{deletingProduct.name}'</span> from active inventory sales?
+              </p>
+
+              <div className="flex items-center justify-end space-x-3 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setDeletingProduct(null)}
+                  className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 text-sm font-semibold rounded-xl transition cursor-pointer"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  onClick={confirmDeleteProduct}
+                  className="px-4 py-2 bg-red-600 hover:bg-red-500 text-white text-sm font-semibold rounded-xl transition cursor-pointer shadow-lg shadow-red-600/30"
+                >
+                  Confirm Delete
+                </button>
+              </div>
             </div>
           </div>
         )}
